@@ -174,7 +174,6 @@ export const QueryChildren = {
 export const TestType = {
   $name: 'tests',
   $id: 'id',
-  $packageIncludes: ['children'],
   $fields: {
     id: {
       type: 'number',

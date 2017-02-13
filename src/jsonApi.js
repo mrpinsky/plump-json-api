@@ -5,7 +5,6 @@ const $schemata = Symbol('$schemata');
 export class JSONApi {
   constructor(opts = {}) {
     const options = Object.assign({}, {
-      storage: [],
       schemata: [],
     }, opts);
 
