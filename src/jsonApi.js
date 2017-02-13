@@ -18,30 +18,34 @@ export class JSONApi {
 
   parse(json) {
     const data = typeof json === 'string' ? JSON.parse(json) : json;
-    const type = this.type(data.data.type);
-    const relationships = this.$$parseRelationships(data.relationships);
+    const schema = this[$schemata][data.data.type];
+    if (schema === undefined) {
+      throw new Error(`No schema for type: ${data.data.type}`);
+    }
+    const relationships = this.$$parseRelationships(data.data.id, data.relationships);
 
-    const requested = Object.assign(
+    const root = Object.assign(
       {
-        [type.$id]: data.id,
+        [schema.$id]: data.data.id,
+        type: schema.$name,
       },
       data.attributes,
       relationships
     );
-    this.save();
 
     const extended = data.included.map(inclusion => {
-      // const childType = this.type(inclusion.type);
-      // const childId = inclusion.id;
+      const childType = this[$schemata][inclusion.type];
       const childData = Object.assign(
-        {},
-        inclusion.attributes,
-        this.parseRelationships(inclusion.relationships)
+        { type: childType.$name, [childType.$id]: inclusion.id },
+        inclusion.attributes
       );
+      if (inclusion.relationships) {
+        Object.assign(childData, this.$$parseRelationships(inclusion.id, inclusion.relationships));
+      }
       return childData;
     });
 
-    return { requested, extended };
+    return { root, extended };
   }
 
   encode({ root, extended }, opts) {
@@ -92,18 +96,21 @@ export class JSONApi {
     return Object.keys(this[$schemata]);
   }
 
-  $$parseRelationships(data) {
-    const schema = this[$schemata][data.data.type];
-    if (schema === undefined) {
-      throw new Error(`Cannot parse type: ${data.data.type}`);
-    }
+  $$parseRelationships(parentId, data) {
+    return Object.keys(data).map(relName => {
+      // All children in this relationship should have
+      // the same type, so get the type of the first one
+      const typeName = data[relName].data[0].type;
+      const schema = this[$schemata][typeName];
+      if (schema === undefined) {
+        throw new Error(`Cannot parse type: ${typeName}`);
+      }
 
-    return Object.keys(data.relationships).map(relName => {
       const relationship = schema.$fields[relName].relationship;
       return {
-        [relName]: data.relationships[relName].data.map(child => {
+        [relName]: data[relName].data.map(child => {
           return {
-            [relationship.$sides[relName].self.field]: data.id,
+            [relationship.$sides[relName].self.field]: parentId,
             [relationship.$sides[relName].other.field]: child.id,
           };
         }),
