@@ -1,22 +1,20 @@
 import mergeOptions from 'merge-options';
 
-import { Model, $self } from './model';
-
-const $types = Symbol('$types');
+const $schemata = Symbol('$schemata');
 
 export class JSONApi {
   constructor(opts = {}) {
     const options = Object.assign({}, {
       storage: [],
-      types: [],
+      schemata: [],
     }, opts);
 
-    this[$types] = {};
+    this[$schemata] = {};
 
-    if (!Array.isArray(options.schema)) {
-      options.schema = [options.schema];
+    if (!Array.isArray(options.schemata)) {
+      options.schemata = [options.schemata];
     }
-    this.$$addTypesFromSchema(options.schema);
+    options.schemata.forEach(s => this.$$addSchema(s));
   }
 
   parse(json) {
@@ -34,8 +32,8 @@ export class JSONApi {
     this.save();
 
     const extended = data.included.map(inclusion => {
-      const childType = this.type(inclusion.type);
-      const childId = inclusion.id;
+      // const childType = this.type(inclusion.type);
+      // const childId = inclusion.id;
       const childData = Object.assign(
         {},
         inclusion.attributes,
@@ -48,7 +46,7 @@ export class JSONApi {
   }
 
   encode({ root, extended }, opts) {
-    const type = this.$$type(root.type);
+    const schema = this[$schemata][root.type];
     const options = Object.assign(
       {},
       {
@@ -62,15 +60,15 @@ export class JSONApi {
     const includedPkg = this.$$includedPackage(extended, opts);
     const attributes = {};
 
-    Object.keys(type.$fields).filter(field => {
-      return field !== type.$id && type.$fields[field].type !== 'hasMany';
+    Object.keys(schema.$fields).filter(field => {
+      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
     }).forEach(key => {
       attributes[key] = root[key];
     });
 
     const retVal = {
-      links: { self: `${prefix}/${type.$name}/${root.id}` },
-      data: { type: type.$name, id: root.id },
+      links: { self: `${prefix}/${schema.$name}/${root.id}` },
+      data: { type: schema.$name, id: root.id },
       attributes: attributes,
       included: includedPkg,
     };
@@ -83,35 +81,26 @@ export class JSONApi {
     return retVal;
   }
 
-  $$addTypesFromSchema(schema, ExtendingModel = Model) {
-    Object.keys(schema).forEach((k) => {
-      class DynamicModel extends ExtendingModel {}
-      DynamicModel.fromJSON(schema[k]);
-      this.$$addType(DynamicModel);
-    });
-  }
-
-  $$addType(T) {
-    if (this[$types][T.$name] === undefined) {
-      this[$types][T.$name] = T;
+  $$addSchema(schema) {
+    if (this[$schemata][schema.$name] === undefined) {
+      this[$schemata][schema.$name] = schema;
     } else {
-      throw new Error(`Duplicate Type registered: ${T.$name}`);
+      throw new Error(`Duplicate schema registered: ${schema.name}`);
     }
   }
 
-  $$type(T) {
-    return this[$types][T];
-  }
-
-  $$types() {
-    return Object.keys(this[$types]);
+  $$schemata() {
+    return Object.keys(this[$schemata]);
   }
 
   $$parseRelationships(data) {
-    const type = this.$$type(data.data.type);
+    const schema = this[$schemata][data.data.type];
+    if (schema === undefined) {
+      throw new Error(`Cannot parse type: ${data.data.type}`);
+    }
 
     return Object.keys(data.relationships).map(relName => {
-      const relationship = type.$fields[relName].relationship;
+      const relationship = schema.$fields[relName].relationship;
       return {
         [relName]: data.relationships[relName].data.map(child => {
           return {
@@ -124,10 +113,13 @@ export class JSONApi {
   }
 
   $$relatedPackage(root, opts = {}) {
-    const type = this.$$type(root.type);
+    const schema = this[$schemata][root.type];
+    if (schema === undefined) {
+      throw new Error(`Cannot package type: ${root.type}`);
+    }
     const options = Object.assign(
       {},
-      { include: this.$$type(root.type).$include },
+      { include: this[$schemata][root.type].$include },
       opts
     );
     const prefix = `${options.domain || ''}${options.path || ''}`;
@@ -135,13 +127,13 @@ export class JSONApi {
 
     const retVal = {};
     fields.forEach(field => {
-      const childSpec = type.$fields[field].relationship.$sides[field].other;
+      const childSpec = schema.$fields[field].relationship.$sides[field].other;
       retVal[field] = {
         links: {
-          related: `${prefix}/${type.$name}/${root[type.$id]}/${field}`,
+          related: `${prefix}/${schema.$name}/${root[schema.$id]}/${field}`,
         },
         data: root[field].map(child => {
-          return { type: this.$$type(childSpec.type).$name, id: child[childSpec.field] };
+          return { type: this[$schemata][childSpec.type].$name, id: child[childSpec.field] };
         }),
       };
     });
@@ -151,12 +143,15 @@ export class JSONApi {
 
   $$packageForInclusion(data, opts = {}) {
     const prefix = `${opts.domain || ''}${opts.path || ''}`;
-    const type = this.$$type(data.type);
+    const schema = this[$schemata][data.type];
+    if (schema === undefined) {
+      throw new Error(`Cannot package included type: ${data.type}`);
+    }
 
     const relationships = this.$$relatedPackage(data, opts);
     const attributes = {};
-    Object.keys(type.$fields).filter(field => {
-      return field !== type.$id && type.$fields[field].type !== 'hasMany';
+    Object.keys(schema.$fields).filter(field => {
+      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
     }).forEach(field => {
       if (data[field] !== 'undefined') {
         attributes[field] = data[field];
@@ -168,7 +163,7 @@ export class JSONApi {
       id: data.id,
       attributes: attributes,
       links: {
-        self: `${prefix}/${type.$name}/${data.id}`,
+        self: `${prefix}/${schema.$name}/${data.id}`,
       },
     };
 

@@ -2,9 +2,9 @@
 
 import fs from 'fs';
 import chai from 'chai';
-import chaiAsPromised from 'chai-as-promised';
+// import chaiAsPromised from 'chai-as-promised';
 
-chai.use(chaiAsPromised);
+// chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 import { JSONApi } from '../jsonApi';
@@ -12,7 +12,7 @@ import { TestType } from './testType';
 
 describe('JSON API', () => {
   it('should encode a model with all extended data in included', () => {
-    const api = new JSONApi({ schema: TestType.toJSON() });
+    const api = new JSONApi({ schemata: TestType });
 
     const root = {
       type: 'tests',
