@@ -7,7 +7,7 @@ import chai from 'chai';
 // chai.use(chaiAsPromised);
 const expect = chai.expect;
 
-import { JSONApi } from '../jsonApi';
+import { JSONApi } from '../index';
 import { TestType } from './testType';
 
 describe('JSON API', () => {
