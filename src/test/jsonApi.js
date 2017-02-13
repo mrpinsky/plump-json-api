@@ -40,6 +40,6 @@ describe('JSON API', () => {
     };
 
     expect(JSON.parse(JSON.stringify(api.encode({ root, extended }, { domain: 'https://example.com', path: '/api' }))))
-    .to.deep.equal(JSON.parse(fs.readFileSync('src/test/jsonApiExample.json')));
+    .to.deep.equal(JSON.parse(fs.readFileSync('src/test/jsonApiSample.json')));
   });
 });
