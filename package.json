@@ -1,6 +1,6 @@
 {
   "name": "plump-json-api",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "A JSON API implementation for use in Plump that should be usable elsewhere as well",
   "main": "dist/index.js",
   "dependencies": {

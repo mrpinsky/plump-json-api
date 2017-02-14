@@ -191,6 +191,6 @@ export class JSONApi {
     );
     return Object.keys(extended).map(relationship => {
       return extended[relationship].map(child => this.$$packageForInclusion(child, options));
-    }).reduce((acc, curr) => acc.concat(curr));
+    }).reduce((acc, curr) => acc.concat(curr), []);
   }
 }
