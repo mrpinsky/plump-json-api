@@ -5,9 +5,11 @@ const $schemata = Symbol('$schemata');
 export class JSONApi {
   constructor(opts = {}) {
     const options = Object.assign({}, {
+      baseURL: '',
       schemata: [],
     }, opts);
 
+    this.baseURL = options.baseURL;
     this[$schemata] = {};
 
     if (!Array.isArray(options.schemata)) {
@@ -29,10 +31,13 @@ export class JSONApi {
 
   encode({ root, extended }, opts) {
     const schema = this[$schemata][root.type];
-    const options = {
-      prefix: `${opts.domain || ''}${opts.path || ''}`,
-      include: schema.$include,
-    };
+    const options = Object.assign(
+      {
+        prefix: this.baseURL,
+        include: schema.$include,
+      },
+      opts
+    );
 
     // NOTE: This implementation does not currently ensure full linkage.
     // It assumes that extended only contains data that is linked to
@@ -68,22 +73,13 @@ export class JSONApi {
     if (schema === undefined) {
       throw new Error(`No schema for type: ${data.type}`);
     } else {
-      const options = Object.assign(
-        {},
-        {
-          include: schema.$include,
-          prefix: '',
-        },
-        opts
-      );
-
-      const link = `${options.prefix}/${data.type}/${data[schema.$id]}`;
+      const link = `${opts.prefix}/${data.type}/${data[schema.$id]}`;
 
       return {
         type: data.type,
         id: data[schema.$id],
         attributes: this.$$encodeAttributes(data),
-        relationships: this.$$encodeRelationships(data, schema, Object.assign(options, { prefix: link })),
+        relationships: this.$$encodeRelationships(data, schema, Object.assign(opts, { prefix: link })),
         links: { self: link },
       };
     }
