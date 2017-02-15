@@ -1,27 +1,26 @@
 export const jsonApiSample = {
-  links: {
-    self: 'https://example.com/api/tests/1',
-  },
   data: {
     type: 'tests',
     id: 1,
-  },
-  attributes: {
-    name: 'potato',
-    extended: {},
-  },
-  relationships: {
-    children: {
-      links: {
-        related: 'https://example.com/api/tests/1/children',
+    attributes: {
+      name: 'potato',
+      extended: {},
+    },
+    relationships: {
+      children: {
+        links: {
+          related: 'https://example.com/api/tests/1/children',
+        },
+        data: [
+          { type: 'tests', id: 2 },
+        ],
       },
-      data: [
-        { type: 'tests', id: 2 },
-      ],
+    },
+    links: {
+      self: 'https://example.com/api/tests/1',
     },
   },
-  included:
-  [
+  included: [
     {
       type: 'tests',
       id: 2,
