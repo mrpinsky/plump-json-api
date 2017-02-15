@@ -1,15 +1,11 @@
 /* eslint-env node, mocha */
 
-import fs from 'fs';
 import chai from 'chai';
-// import chaiAsPromised from 'chai-as-promised';
-
-// chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 import { JSONApi } from '../index';
 import { TestType } from './testType';
-import { sample } from './jsonApiSample';
+import { jsonApiSample as sample } from './jsonApiSample.js';
 
 describe('JSON API', () => {
   const api = new JSONApi({ schemata: TestType });
@@ -20,14 +16,14 @@ describe('JSON API', () => {
     id: 1,
     name: 'potato',
     extended: {},
-    children: [{ parent_id: 1, child_id: 2 }],
+    children: [{ id: 2 }],
   };
   const two = {
     type: 'tests',
     id: 2,
     name: 'frotato',
     extended: { cohort: 2013 },
-    children: [{ parent_id: 2, child_id: 3 }],
+    children: [{ id: 3 }],
   };
   const three = {
     type: 'tests',
@@ -71,12 +67,12 @@ describe('JSON API', () => {
           links: { self: 'https://example.com/api/tests/3' },
         },
         included: [],
-      })).to.deep.equal(three);
+      })).to.deep.equal({ root: three, extended: [] });
     });
 
     it('should parse a returned document with included data', () => {
       expect(api.parse(sample)).to.deep.equal({
-        root: root,
+        root: one,
         extended: [two, three],
       });
     });

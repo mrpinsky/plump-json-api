@@ -16,36 +16,15 @@ export class JSONApi {
     options.schemata.forEach(s => this.$$addSchema(s));
   }
 
-  parse(json) {
-    const data = typeof json === 'string' ? JSON.parse(json) : json;
-    const schema = this[$schemata][data.data.type];
-    if (schema === undefined) {
-      throw new Error(`No schema for type: ${data.data.type}`);
-    }
-    const relationships = this.$$parseRelationships(data.data.id, data.relationships);
+  parse(response) {
+    const json = typeof response === 'string' ? JSON.parse(response) : response;
+    const data = json.data;
+    const included = json.included;
 
-    const root = Object.assign(
-      {
-        [schema.$id]: data.data.id,
-        type: schema.$name,
-      },
-      data.attributes,
-      relationships
-    );
-
-    const extended = data.included.map(inclusion => {
-      const childType = this[$schemata][inclusion.type];
-      const childData = Object.assign(
-        { type: childType.$name, [childType.$id]: inclusion.id },
-        inclusion.attributes
-      );
-      if (inclusion.relationships) {
-        Object.assign(childData, this.$$parseRelationships(inclusion.id, inclusion.relationships));
-      }
-      return childData;
-    });
-
-    return { root, extended };
+    return {
+      root: this.$$parseDataObject(data),
+      extended: included.map(item => this.$$parseDataObject(item)),
+    };
   }
 
   encode({ root, extended }, opts) {
@@ -96,23 +75,72 @@ export class JSONApi {
     return Object.keys(this[$schemata]);
   }
 
-  $$parseRelationships(parentId, data) {
-    return Object.keys(data).map(relName => {
+  $$attributeFields(type) {
+    const schema = this[$schemata][type];
+    return Object.keys(schema.$fields).filter(field => {
+      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
+    });
+  }
+
+  $$parseDataObject(data) {
+    console.log(data);
+    const schema = this[$schemata][data.type];
+    if (schema === undefined) {
+      throw new Error(`No schema for type: ${data.type}`);
+    } else {
+      return mergeOptions(
+        { type: data.type, [schema.$id]: data.id },
+        data.attributes,
+        this.$$parseRelationships(data.id, data.relationships)
+      );
+    }
+  }
+
+  $$encodeDataObject(data, opts) {
+    const schema = this[$schemata][data.type];
+    if (schema === undefined) {
+      throw new Error(`No schema for type: ${data.type}`);
+    } else {
+      const options = Object.assign(
+        {},
+        {
+          include: schema.$include,
+          prefix: '',
+        },
+        opts
+      );
+      const link = `${options.prefix}/${data.type}/${data[schema.$id]}`;
+      const relationships = this.$$encodeRelationships(data, options);
+      return {
+        type: data.type,
+        id: data[schema.$id],
+        attributes: this.$$attributeFields(data.type)
+          .map(attr => {
+            return { [attr]: data[attr] };
+          })
+          .reduce((acc, curr) => mergeOptions(acc, curr), {}),
+        relationships: relationships,
+        links: {
+          self: link,
+          related: Object.keys(relationships).map(rel => `${link}/${rel}`),
+        },
+      };
+    }
+  }
+
+  $$parseRelationships(parentId, relationships) {
+    return Object.keys(relationships).map(relName => {
       // All children in this relationship should have
       // the same type, so get the type of the first one
-      const typeName = data[relName].data[0].type;
+      const typeName = relationships[relName].data[0].type;
       const schema = this[$schemata][typeName];
       if (schema === undefined) {
         throw new Error(`Cannot parse type: ${typeName}`);
       }
 
-      const relationship = schema.$fields[relName].relationship;
       return {
-        [relName]: data[relName].data.map(child => {
-          return {
-            [relationship.$sides[relName].self.field]: parentId,
-            [relationship.$sides[relName].other.field]: child.id,
-          };
+        [relName]: relationships[relName].data.map(child => {
+          return { id: child.id };
         }),
       };
     }).reduce((acc, curr) => mergeOptions(acc, curr), {});

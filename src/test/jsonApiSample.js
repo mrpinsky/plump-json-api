@@ -47,6 +47,7 @@ export const jsonApiSample = {
         name: 'rutabaga',
         extended: {},
       },
+      relationships: {},
       links: {
         self: 'https://example.com/api/tests/3',
       },
