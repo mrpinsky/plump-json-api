@@ -159,7 +159,7 @@ export class JSONApi {
     Object.keys(schema.$fields).filter(field => {
       return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
     }).forEach(field => {
-      if (data[field] !== 'undefined') {
+      if (data[field] !== undefined) {
         attributes[field] = data[field];
       }
     });

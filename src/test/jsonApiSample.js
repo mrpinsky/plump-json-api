@@ -11,9 +11,7 @@ export const jsonApiSample = {
         links: {
           related: 'https://example.com/api/tests/1/children',
         },
-        data: [
-          { type: 'tests', id: 2 },
-        ],
+        data: [{ type: 'tests', id: 2 }],
       },
     },
     links: {
