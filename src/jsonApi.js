@@ -32,10 +32,7 @@ export class JSONApi {
   encode({ root, extended }, opts) {
     const schema = this[$schemata][root.type];
     const options = Object.assign(
-      {
-        prefix: this.baseURL,
-        include: schema.$include,
-      },
+      { include: schema.$include },
       opts
     );
 
@@ -73,13 +70,13 @@ export class JSONApi {
     if (schema === undefined) {
       throw new Error(`No schema for type: ${data.type}`);
     } else {
-      const link = `${opts.prefix}/${data.type}/${data[schema.$id]}`;
+      const link = `${this.baseURL}/${data.type}/${data[schema.$id]}`;
 
       return {
         type: data.type,
         id: data[schema.$id],
         attributes: this.$$encodeAttributes(data),
-        relationships: this.$$encodeRelationships(data, schema, Object.assign(opts, { prefix: link })),
+        relationships: this.$$encodeRelationships(data, schema, opts),
         links: { self: link },
       };
     }
@@ -126,7 +123,7 @@ export class JSONApi {
     return relFields.map(field => {
       return {
         [field]: {
-          links: { related: `${opts.prefix}/${field}` },
+          links: { related: `${this.baseURL}/${data.type}/${data[schema.$id]}/${field}` },
           data: data[field].map(rel => {
             const type = schema.$fields[field].relationship.$sides[field].other.type;
             return this.$$resourceIdentifier(type, rel);

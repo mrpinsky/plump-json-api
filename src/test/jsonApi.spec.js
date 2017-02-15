@@ -7,34 +7,32 @@ import { JSONApi } from '../index';
 import { TestType } from './testType';
 import { jsonApiSample as sample } from './jsonApiSample.js';
 
+const api = new JSONApi({ schemata: TestType, baseURL: 'https://example.com/api' });
+const one = {
+  type: 'tests',
+  id: 1,
+  name: 'potato',
+  extended: {},
+  children: [{ id: 2 }],
+};
+const two = {
+  type: 'tests',
+  id: 2,
+  name: 'frotato',
+  extended: { cohort: 2013 },
+  children: [{ id: 3 }],
+};
+const three = {
+  type: 'tests',
+  id: 3,
+  name: 'rutabaga',
+  extended: {},
+};
+
 describe('JSON API', () => {
-  const api = new JSONApi({ schemata: TestType });
-  const apiOpts = { domain: 'https://example.com', path: '/api' };
-
-  const one = {
-    type: 'tests',
-    id: 1,
-    name: 'potato',
-    extended: {},
-    children: [{ id: 2 }],
-  };
-  const two = {
-    type: 'tests',
-    id: 2,
-    name: 'frotato',
-    extended: { cohort: 2013 },
-    children: [{ id: 3 }],
-  };
-  const three = {
-    type: 'tests',
-    id: 3,
-    name: 'rutabaga',
-    extended: {},
-  };
-
   describe('Encoding', () => {
     it('should encode a model with no children', () => {
-      expect(JSON.parse(JSON.stringify(api.encode({ root: three, extended: [] }, apiOpts))))
+      expect(JSON.parse(JSON.stringify(api.encode({ root: three, extended: [] }))))
       .to.deep.equal({
         data: {
           type: 'tests',
@@ -51,7 +49,7 @@ describe('JSON API', () => {
       expect(JSON.parse(JSON.stringify(api.encode({
         root: one,
         extended: [two, three],
-      }, apiOpts))))
+      }))))
       .to.deep.equal(sample);
     });
   });
