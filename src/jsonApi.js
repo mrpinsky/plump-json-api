@@ -29,38 +29,17 @@ export class JSONApi {
 
   encode({ root, extended }, opts) {
     const schema = this[$schemata][root.type];
-    const options = Object.assign(
-      {},
-      {
-        domain: 'https://example.com',
-        path: '/api',
-      },
-      opts
-    );
-    const prefix = `${options.domain || ''}${options.path || ''}`;
-
-    const includedPkg = this.$$includedPackage(extended, opts);
-    const attributes = {};
-
-    Object.keys(schema.$fields).filter(field => {
-      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
-    }).forEach(key => {
-      attributes[key] = root[key];
-    });
-
-    const retVal = {
-      links: { self: `${prefix}/${schema.$name}/${root.id}` },
-      data: { type: schema.$name, id: root.id },
-      attributes: attributes,
-      included: includedPkg,
+    const options = {
+      prefix: `${opts.domain || ''}${opts.path || ''}`,
+      include: schema.$include,
     };
 
-    const relationships = this.$$relatedPackage(root, opts);
-    if (Object.keys(relationships).length > 0) {
-      retVal.relationships = relationships;
-    }
-
-    return retVal;
+    // NOTE: This implementation does not currently ensure full linkage.
+    // It assumes that extended only contains data that is linked to
+    return {
+      data: this.$$encodeDataObject(root, options),
+      included: extended.map(child => this.$$encodeDataObject(child, options)),
+    };
   }
 
   $$addSchema(schema) {
@@ -71,19 +50,7 @@ export class JSONApi {
     }
   }
 
-  $$schemata() {
-    return Object.keys(this[$schemata]);
-  }
-
-  $$attributeFields(type) {
-    const schema = this[$schemata][type];
-    return Object.keys(schema.$fields).filter(field => {
-      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
-    });
-  }
-
   $$parseDataObject(data) {
-    console.log(data);
     const schema = this[$schemata][data.type];
     if (schema === undefined) {
       throw new Error(`No schema for type: ${data.type}`);
@@ -109,23 +76,32 @@ export class JSONApi {
         },
         opts
       );
+
       const link = `${options.prefix}/${data.type}/${data[schema.$id]}`;
-      const relationships = this.$$encodeRelationships(data, options);
+
       return {
         type: data.type,
         id: data[schema.$id],
-        attributes: this.$$attributeFields(data.type)
-          .map(attr => {
-            return { [attr]: data[attr] };
-          })
-          .reduce((acc, curr) => mergeOptions(acc, curr), {}),
-        relationships: relationships,
-        links: {
-          self: link,
-          related: Object.keys(relationships).map(rel => `${link}/${rel}`),
-        },
+        attributes: this.$$encodeAttributes(data),
+        relationships: this.$$encodeRelationships(data, schema, Object.assign(options, { prefix: link })),
+        links: { self: link },
       };
     }
+  }
+
+  $$attributeFields(type) {
+    const schema = this[$schemata][type];
+    return Object.keys(schema.$fields).filter(field => {
+      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
+    });
+  }
+
+  $$encodeAttributes(data) {
+    return this.$$attributeFields(data.type)
+      .map(attr => {
+        return { [attr]: data[attr] };
+      })
+      .reduce((acc, curr) => mergeOptions(acc, curr), {});
   }
 
   $$parseRelationships(parentId, relationships) {
@@ -146,79 +122,35 @@ export class JSONApi {
     }).reduce((acc, curr) => mergeOptions(acc, curr), {});
   }
 
-  $$relatedPackage(root, opts = {}) {
-    const schema = this[$schemata][root.type];
-    if (schema === undefined) {
-      throw new Error(`Cannot package type: ${root.type}`);
-    }
-    const options = Object.assign(
-      {},
-      { include: this[$schemata][root.type].$include },
-      opts
-    );
-    const prefix = `${options.domain || ''}${options.path || ''}`;
-    const fields = Object.keys(options.include).filter(rel => root[rel] && root[rel].length);
+  $$encodeRelationships(data, schema, opts) {
+    const relFields = Object.keys(data).filter(field => {
+      return schema.$fields[field] && schema.$fields[field].type === 'hasMany' && opts.include[field];
+    });
 
-    const retVal = {};
-    fields.forEach(field => {
-      const childSpec = schema.$fields[field].relationship.$sides[field].other;
-      retVal[field] = {
-        links: {
-          related: `${prefix}/${schema.$name}/${root[schema.$id]}/${field}`,
+    return relFields.map(field => {
+      return {
+        [field]: {
+          links: { related: `${opts.prefix}/${field}` },
+          data: data[field].map(rel => {
+            const type = schema.$fields[field].relationship.$sides[field].other.type;
+            return this.$$resourceIdentifier(type, rel);
+          }),
         },
-        data: root[field].map(child => {
-          return { type: this[$schemata][childSpec.type].$name, id: child[childSpec.field] };
-        }),
       };
-    });
-
-    return retVal;
+    }).reduce((acc, curr) => mergeOptions(acc, curr), {});
   }
 
-  $$packageForInclusion(data, opts = {}) {
-    const prefix = `${opts.domain || ''}${opts.path || ''}`;
-    const schema = this[$schemata][data.type];
-    if (schema === undefined) {
-      throw new Error(`Cannot package included type: ${data.type}`);
-    }
-
-    const relationships = this.$$relatedPackage(data, opts);
-    const attributes = {};
-    Object.keys(schema.$fields).filter(field => {
-      return field !== schema.$id && schema.$fields[field].type !== 'hasMany';
-    }).forEach(field => {
-      if (data[field] !== undefined) {
-        attributes[field] = data[field];
+  $$resourceIdentifier(type, rel) {
+    const retVal = { type: type, id: rel.id };
+    const meta = {};
+    for (const key in rel) {
+      if (key !== 'id') {
+        meta[key] = rel[key];
       }
-    });
-
-    const retVal = {
-      type: data.type,
-      id: data.id,
-      attributes: attributes,
-      links: {
-        self: `${prefix}/${schema.$name}/${data.id}`,
-      },
-    };
-
-    if (Object.keys(relationships).length > 0) {
-      retVal.relationships = relationships;
     }
-
+    if (Object.keys(meta).length > 0) { // meta !== {}
+      retVal.meta = meta;
+    }
     return retVal;
-  }
-
-  $$includedPackage(extended = {}, opts = {}) {
-    const options = Object.assign(
-      {},
-      {
-        domain: 'https://example.com',
-        path: '/api',
-      },
-      opts
-    );
-    return Object.keys(extended).map(relationship => {
-      return extended[relationship].map(child => this.$$packageForInclusion(child, options));
-    }).reduce((acc, curr) => acc.concat(curr), []);
   }
 }

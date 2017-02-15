@@ -34,7 +34,7 @@ describe('JSON API', () => {
 
   describe('Encoding', () => {
     it('should encode a model with no children', () => {
-      expect(JSON.parse(JSON.stringify(api.encode({ root: three, extended: {} }, apiOpts))))
+      expect(JSON.parse(JSON.stringify(api.encode({ root: three, extended: [] }, apiOpts))))
       .to.deep.equal({
         data: {
           type: 'tests',
@@ -50,7 +50,7 @@ describe('JSON API', () => {
     it('should encode a model with children', () => {
       expect(JSON.parse(JSON.stringify(api.encode({
         root: one,
-        extended: { children: [two, three] },
+        extended: [two, three],
       }, apiOpts))))
       .to.deep.equal(sample);
     });
