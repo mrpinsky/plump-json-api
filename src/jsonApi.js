@@ -52,6 +52,10 @@ export class JSONApi {
     }
   }
 
+  schema(name) {
+    return this[$schemata][name];
+  }
+
   $$parseDataObject(data) {
     const schema = this[$schemata][data.type];
     if (schema === undefined) {
